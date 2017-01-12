@@ -421,12 +421,19 @@ class KeyPressInteractorStyle(vtk.vtkInteractorStyleTrackballCamera):
         i = [0]
         key_dic = [global_keyDic]
         while True:
-            if isinstance(key_dic[-1][global_keys_down[i[-1]]], dict):
-                key_dic.append(key_dic[-1][global_keys_down[i[-1]]])
-                i.append(0)
-            elif callable(key_dic[-1][global_keys_down[i[-1]]]):
-                key_dic[-1][global_keys_down[i[-1]]]()
-            if i[-1] < len(global_keys_down)-1:
+            try:
+                if isinstance(key_dic[-1][global_keys_down[i[-1]]], dict):
+                    key_dic.append(key_dic[-1][global_keys_down[i[-1]]])
+                    i[-1] += 1
+                    i.append(0)
+                    continue
+                elif callable(key_dic[-1][global_keys_down[i[-1]]]):
+                    key_dic[-1][global_keys_down[i[-1]]]()
+            except KeyError:
+                pass
+            except IndexError:
+                pass
+            if i[-1] < len(global_keys_down):
                 i[-1]+=1
             elif len(i) > 1:
                 i.pop()
@@ -764,7 +771,7 @@ class TMVisualizer(TimerCallback):
                                       'minus': self.slow_down,
                                       's': self.toggle_show_active_segments,
                                       'm':self.toggle_show_matching_segments,
-                                      '1': self.toggle_show_all_segments})
+                                      'Shift_L': {'exclam': self.toggle_show_all_segments}})
 
     def toggle_show_all_segments(self):
         self.show_all_segments = not self.show_all_segments

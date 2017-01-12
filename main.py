@@ -147,7 +147,7 @@ def formatRow(x):
 # Step 1: create Temporal Pooler instance with appropriate parameters
 
 tm = TM(columnDimensions=(24,),
-        cellsPerColumn=1,
+        cellsPerColumn=4,
         initialPermanence=0.5,
         connectedPermanence=0.5,
         minThreshold=2,

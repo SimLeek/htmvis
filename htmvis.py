@@ -227,6 +227,9 @@ class TimerCallback(object):
         self.lerp_fade_time = fade_time
         self.remaining_lerp_fade_time = fade_time
 
+    def set_lerp_remainder(self, lerp_remainder):
+        self.lerp_multiplier = 1 - lerp_remainder
+
     def _calculate_point_color_lerp(self):
 
         #print(self.remaining_lerp_fade_time)
@@ -235,7 +238,7 @@ class TimerCallback(object):
 
             #print(self.lerp_fade_time, self.remaining_lerp_fade_time)
 
-            lerp_val = 1*(self.lerp_fade_time - self.remaining_lerp_fade_time)/self.lerp_fade_time
+            lerp_val = self.lerp_multiplier*(self.lerp_fade_time - self.remaining_lerp_fade_time)/self.lerp_fade_time
 
             #print(lerp_val)
 
@@ -278,6 +281,9 @@ class TimerCallback(object):
             self.points.SetPoint(point_indices, (x, y, z))
         self.points_poly.Modified()
 
+    def add_key_input_functions(self, keydic):
+        self.interactor_style.append_input_keydic(keydic)
+
     def __init__(self):
         self.timer_count = 0
         self.last_velocity_update = time.clock()
@@ -286,8 +292,8 @@ class TimerCallback(object):
         self._loop_time = time.clock()
         self.unused_locations = []
         self.remaining_lerp_fade_time = 0
+        self.lerp_multiplier = 1
         self.line_id_array = IdArray()
-        self.start()
 
     def start(self):
         pass
@@ -302,6 +308,7 @@ class TimerCallback(object):
         pass
 
     def execute(self, obj, event):
+        self.start()
         self.loop(obj, event)
 
         self.points_poly.GetPointData().GetScalars().Modified()
@@ -320,6 +327,11 @@ class KeyPressInteractorStyle(vtk.vtkInteractorStyleTrackballCamera):
         if parent is not None:
             global_interactor_parent = parent
 
+        #DO NOT REMOVE GLOBAL INSTANTIATIONS!
+        #due to problems with vtk losing data when moving python classes through c++, these globals muse be used to pass
+        # data between class functions
+        #todo: try different python class types, such as inheriting from 'object' and defining class variables
+
         global global_camera
         global_camera = camera
 
@@ -328,6 +340,7 @@ class KeyPressInteractorStyle(vtk.vtkInteractorStyleTrackballCamera):
 
         global global_keyDic
         global_keyDic = {
+            'RECALC': self.recalc_dic,
             'w': self._move_forward,
             's': self._move_backward,
             'a': self._yaw_left,
@@ -336,7 +349,11 @@ class KeyPressInteractorStyle(vtk.vtkInteractorStyleTrackballCamera):
             'space': self._pitch_down
         }
 
+        global global_keys_down
+        global_keys_down = []
+
         self.AddObserver("KeyPressEvent", self.keyPress)
+        self.AddObserver("KeyReleaseEvent", self.keyRelease)
         # self.RemoveObservers("LeftButtonPressEvent")
         # self.AddObserver("LeftButtonPressEvent", self.dummy_func)
 
@@ -349,6 +366,11 @@ class KeyPressInteractorStyle(vtk.vtkInteractorStyleTrackballCamera):
 
     def dummy_func_2(self, obj, ev):
         pass
+
+    def append_input_keydic(self, keydic):
+        """Keydic must be a dictionary of vtk key strings containing either a keydic or a function"""
+        global_keyDic.update(keydic)
+
 
     def _move_forward(self):
         # todo: change this to a velocity function with drag and let something else
@@ -390,15 +412,38 @@ class KeyPressInteractorStyle(vtk.vtkInteractorStyleTrackballCamera):
         global_camera.Pitch(-10)
         global_camera_renderWindow.GetInteractor().Render()
 
+    def recalc_dic(self):
+        """calls all the functions in the key dictionary
+        recursively goes through keydics containing keydics until a function is reached"""
+
+        global global_keys_down
+        print(global_keys_down)
+        i = [0]
+        key_dic = [global_keyDic]
+        while True:
+            if isinstance(key_dic[-1][global_keys_down[i[-1]]], dict):
+                key_dic.append(key_dic[-1][global_keys_down[i[-1]]])
+                i.append(0)
+            elif callable(key_dic[-1][global_keys_down[i[-1]]]):
+                key_dic[-1][global_keys_down[i[-1]]]()
+            if i[-1] < len(global_keys_down)-1:
+                i[-1]+=1
+            elif len(i) > 1:
+                i.pop()
+                key_dic.pop()
+            else:
+                break
+
     # noinspection PyPep8Naming
     def keyPress(self, obj, event):
         key = global_interactor_parent.GetKeySym()
+        if key not in global_keys_down:
+            global_keys_down.append(key)
+            global_keyDic['RECALC']()
 
-        if key in global_keyDic:
-            global_keyDic[key]()
-        else:
-            print(key)
-
+    def keyRelease(self, obj, event):
+        key = global_interactor_parent.GetKeySym()
+        global_keys_down.remove(key)
 
 class PointDisplayer:
     # adapted from:
@@ -481,10 +526,11 @@ class PointDisplayer:
         render_window = vtk.vtkRenderWindow()
         render_window.AddRenderer(renderer)
         render_window_interactor = vtk.vtkRenderWindowInteractor()
-        render_window_interactor.SetInteractorStyle(
-            KeyPressInteractorStyle(camera=renderer.GetActiveCamera(),
+        interactor_style = KeyPressInteractorStyle(camera=renderer.GetActiveCamera(),
                                     render_window=render_window,
                                     parent=render_window_interactor)
+        render_window_interactor.SetInteractorStyle(
+            interactor_style
         )
 
         render_window_interactor.SetRenderWindow(render_window)
@@ -506,6 +552,7 @@ class PointDisplayer:
         render_window_interactor.Initialize()
 
         cb = self.callback_class(*self.callback_class_args, **self.callback_class_kwargs)
+        cb.interactor_style = interactor_style #allow adding/removing input functions
         cb.renderer = renderer
         cb.points = self.points
         cb.points_poly = self.points_poly
@@ -686,12 +733,108 @@ class TMVisualizer(TimerCallback):
         self.columns = np.zeros((tm.columnDimensions[0],))
         self.cells = np.zeros((tm.columnDimensions[0],tm.cellsPerColumn))
 
-        self.change_time = .080
+        self.change_time = .020
         self.current_time = time.clock()
 
         self.active_cell_color = [212, 151, 106]
         self.predicted_cell_color = [85, 36, 0]
         self.winner_cell_color = [255,232,170]
+        self.default_cell_color = [128, 66, 21]
+
+        # show default cells will be added when I can add/remove points well
+        self.show_predicted_cells = True
+        self.show_winner_cells = True
+        self.show_active_cells = True
+        self.show_matching_segments = False
+        self.show_active_segments = False
+        self.show_all_segments = False
+
+
+        self.set_lerp_remainder(.5)
+
+    def start(self):
+        super(TMVisualizer, self).start()  # needed for getting called
+
+        # this needs to be put in start rather than init because the key interactor
+        # is added after initialization
+        self.add_key_input_functions({'a': self.toggle_show_active_cells,
+                                      'p': self.toggle_show_predicted_cells,
+                                      'w': self.toggle_show_winner_cells,
+                                      'plus': self.speed_up,
+                                      'minus': self.slow_down,
+                                      's': self.toggle_show_active_segments,
+                                      'm':self.toggle_show_matching_segments,
+                                      '1': self.toggle_show_all_segments})
+
+    def toggle_show_all_segments(self):
+        self.show_all_segments = not self.show_all_segments
+
+    def toggle_show_active_segments(self):
+        self.show_active_segments = not self.show_active_segments
+
+    def toggle_show_matching_segments(self):
+        self.show_matching_segments = not self.show_matching_segments
+
+    def slow_down(self):
+        self.change_time = self.change_time + .01
+
+    def speed_up(self):
+        self.change_time = max(self.change_time-.01, 0.02) # max 50 hz
+
+    def toggle_show_active_cells(self):
+        self.show_active_cells = not self.show_active_cells
+
+    def toggle_show_predicted_cells(self):
+        self.show_predicted_cells = not self.show_predicted_cells
+
+    def toggle_show_winner_cells(self):
+        self.show_winner_cells = not self.show_winner_cells
+
+    def set_active_cell_color(self, new_color):
+        assert(isinstance(new_color, (tuple, list, np.ndarray, np.generic)))
+        assert(len(new_color) == 3)
+        assert(isinstance(new_color[0], int))
+        self.active_cell_color = new_color
+
+    def set_predicted_cell_color(self, new_color):
+        assert (isinstance(new_color, (tuple, list, np.ndarray, np.generic)))
+        assert (len(new_color) == 3)
+        assert (isinstance(new_color[0], int))
+        self.predicted_cell_color = new_color
+
+    def set_winner_cell_color(self, new_color):
+        assert (isinstance(new_color, (tuple, list, np.ndarray, np.generic)))
+        assert (len(new_color) == 3)
+        assert (isinstance(new_color[0], int))
+        self.winner_cell_color = new_color
+
+    def set_default_cell_color(self, new_color):
+        assert (isinstance(new_color, (tuple, list, np.ndarray, np.generic)))
+        assert (len(new_color) == 3)
+        assert (isinstance(new_color[0], int))
+        self.default_cell_color = new_color
+
+    def _show_segments(self, segments, color_func):
+        #
+        active_links = np.array([], dtype=np.int64)
+        active_link_colors = np.array([], dtype=np.int64)
+        if len(segments) > 0:
+            for i in segments:
+                for j in i._synapses:
+                    active_links = np.append(active_links, [2, i.cell, j.presynapticCell], axis=0)
+                    link_color = color_func(j)
+                    link_color = [int(link_color[0] * 255), int(link_color[1] * 255), int(link_color[2] * 255)]
+                    if len(active_link_colors) > 0:
+                        active_link_colors = np.append(active_link_colors, [link_color], axis=0)
+                    else:
+                        active_link_colors = [link_color]
+
+            self.add_lines(active_links, active_link_colors)
+
+    def _show_cells(self, cells, color_func):
+        if len(cells) > 0:
+            cell_colors = [color_func(c) for c in cells]
+            self.lerp_point_colors(cell_colors, self.change_time, cells)
 
     def loop(self, obj, event):
         super(TMVisualizer, self).loop(obj,event) #needed for lerping
@@ -707,59 +850,35 @@ class TMVisualizer(TimerCallback):
                 self.i = 0
 
 
-            self.setup_lerp_all_point_colors([int(128), int(66), int(21)], self.change_time)
+            self.setup_lerp_all_point_colors(self.default_cell_color, self.change_time)
             self.del_all_lines()
 
-            active_cells = np.array(self.tm.getActiveCells())
-            if len(active_cells) >0:
-                active_cell_colors = [ self.active_cell_color for x in range(len(active_cells))]
-                self.lerp_point_colors(active_cell_colors, self.change_time, active_cells)
-            predicted_cells = np.array(self.tm.getPredictiveCells())
-            if len(predicted_cells) >0:
-                predicted_cells_colors = [ self.predicted_cell_color for x in range(len(predicted_cells))]
-                self.lerp_point_colors(predicted_cells_colors, self.change_time, predicted_cells)
-            winner_cells = np.array(self.tm.getWinnerCells())
-            if len(winner_cells) >0:
-                winner_cells_colors = [self.winner_cell_color for x in range(len(winner_cells))]
-                self.lerp_point_colors(winner_cells_colors, self.change_time, winner_cells)
+            if self.show_active_cells:
+                self._show_cells(np.array(self.tm.getActiveCells()), lambda q: self.active_cell_color)
 
-            active_links = np.array([], dtype=np.int64)
-            active_link_colors = np.array([], dtype=np.int64)
-            if len(self.tm.getMatchingSegments()) > 0:
-                for i in self.tm.getMatchingSegments():
-                    for j in i._synapses:
-                        active_links = np.append(active_links, [2, i.cell, j.presynapticCell], axis=0)
-                        link_color = colorsys.hls_to_rgb(0.941, .75 - j.permanence * .5, .71)
-                        link_color = [int(link_color[0] * 255), int(link_color[1] * 255), int(link_color[2] * 255)]
-                        if len(active_link_colors) > 0:
-                            active_link_colors = np.append(active_link_colors, [link_color], axis=0)
-                        else:
-                            active_link_colors = [link_color]
+            if self.show_predicted_cells:
+                self._show_cells(np.array(self.tm.getPredictiveCells()), lambda q: self.predicted_cell_color)
 
-                self.add_lines(active_links, active_link_colors)
+            if self.show_winner_cells:
+                self._show_cells(np.array(self.tm.getWinnerCells()), lambda q: self.winner_cell_color)
 
-            active_links = np.array([], dtype=np.int64)
-            active_link_colors = np.array([], dtype=np.int64)
-            if len(self.tm.getActiveSegments()) > 0:
-                for i in self.tm.getActiveSegments():
-                    for j in i._synapses:
-                        active_links = np.append(active_links, [2, i.cell, j.presynapticCell], axis=0)
-                        link_color = colorsys.hls_to_rgb(0.481, .75-j.permanence*.5, .5)
-                        link_color = [int(link_color[0] * 255), int(link_color[1] * 255), int(link_color[2] * 255)]
-                        if len(active_link_colors) > 0:
-                            active_link_colors = np.append(active_link_colors, [link_color], axis=0)
-                        else:
-                            active_link_colors = [link_color]
+            if self.show_all_segments:
+                self._show_segments(self.tm.connections._segmentForFlatIdx,
+                                    lambda s: colorsys.hls_to_rgb(0.200, .75 - s.permanence * .5, .5))
 
-                self.add_lines(active_links, active_link_colors)
+            if self.show_matching_segments:
+                self._show_segments(self.tm.getMatchingSegments(), lambda s: colorsys.hls_to_rgb(0.941, .75 - s.permanence * .5, .71))
 
-
+            if self.show_active_segments:
+                self._show_segments(self.tm.getActiveSegments(), lambda s: colorsys.hls_to_rgb(0.481, .75 - s.permanence * .5, .5))
 
             self.i+=1
 
             self.current_time = time.clock()
         else:
             pass
+
+
 
 if __name__=="__main__":
     display_test_point_loop()

@@ -10,6 +10,7 @@ from vtk.util import numpy_support
 from idarray import IdArray
 
 global_keyDic = None
+global_keys_down = None
 
 global_interactor_parent = None
 
@@ -18,54 +19,73 @@ global_camera_renderWindow = None
 
 
 def clamp(n, min_n, max_n):
-    # http://stackoverflow.com/a/5996949
+    #
+    """
+    Clamps a number to a min or max value.
+
+    Args:
+        n (numbers.Number): input number
+        min_n (numbers.Number): min val
+        max_n (numbers.Number): max val
+
+    Returns:
+        numbers.Number: clamped number
+
+    Sources:
+        http://stackoverflow.com/a/5996949
+    """
     return max(min(max_n, n), min_n)
-
-
-
-
-
 
 
 class TimerCallback(object):
     __slots__ = ["points", "point_colors", "timer_count", "points_poly",
                  "lines", "lines_poly", "line_colors", "line_id_array"
-                 "last_velocity_update", "unused_locations",
+                                                       "last_velocity_update", "unused_locations",
                  "last_color_velocity_update", "renderer", "last_bg_color_velocity_update"]
 
     def add_lines(self, lines, line_colors):
-        ids = []
-        np_data = numpy_support.vtk_to_numpy(self.lines.GetData())
+        """
+        Adds multiple lines between any set of points.
 
-        np_color_data = numpy_support.vtk_to_numpy(self.line_colors)
-        if isinstance(lines[0], (list, tuple, np.ndarray, np.generic)):
-            ids.append(range(int(len(np_data)/3), int((len(np_data)+len(lines))/3)))
-            np_data = np.append(np_data, lines)
-            if len(np_color_data)>0:
-                np_color_data = np.append(np_color_data, line_colors, axis=0)
-            else:
-                np_color_data = line_colors
+        Args:
+            lines (list, tuple, np.ndarray, np.generic):
+                An array in the format of [2, point_a, point_b, 2, point_c, point_d, ...]. The two is needed for VTK's
+                  lines.
+            line_colors (list, tuple, np.ndarray, np.generic):
+                An array in the format of [[r1, g1, b1], [r2, g2, b2], ...], with the same length as the number of
+                  lines.
+        Returns:
+            list: An array containing the memory locations of each of the newly inserted lines.
+
+        """
+        assert (isinstance(lines, (list, tuple, np.ndarray, np.generic)))
+        assert (isinstance(line_colors, (list, tuple, np.ndarray, np.generic)))
+
+        np_line_data = numpy_support.vtk_to_numpy(self.lines.GetData())
+        np_line_color_data = numpy_support.vtk_to_numpy(self.line_colors)
+
+        #todo: add lines in unused locations if possible
+        mem_locations = range(int(len(np_line_data) / 3), int((len(np_line_data) + len(lines)) / 3))
+
+        np_line_data = np.append(np_line_data, lines)
+
+        if len(np_line_color_data) > 0:
+            np_line_color_data = np.append(np_line_color_data, line_colors, axis=0)
         else:
-            ids.append(int(len(np_data) / 3))
-            np_data = np.append(np_data, lines)
-            if len(np_color_data)==0:
-                np_color_data = [line_colors]
-            else:
-                np_color_data = np.append(np_color_data, [line_colors], axis=0)
+            np_line_color_data = line_colors
 
-        vtk_data = numpy_support.numpy_to_vtkIdTypeArray(np_data, deep=True)
-        self.lines.SetCells(int(len(np_data) / 3), vtk_data)
+        vtk_line_data = numpy_support.numpy_to_vtkIdTypeArray(np_line_data, deep=True)
+        self.lines.SetCells(int(len(np_line_data) / 3), vtk_line_data)
 
-        vtk_data = numpy_support.numpy_to_vtk(num_array=np_color_data, deep=True, array_type=vtk.VTK_UNSIGNED_CHAR)
-        self.line_colors.DeepCopy(vtk_data)
+        vtk_line_color_data = numpy_support.numpy_to_vtk(num_array=np_line_color_data,
+                                                         deep=True, array_type=vtk.VTK_UNSIGNED_CHAR)
+        self.line_colors.DeepCopy(vtk_line_color_data)
 
-        #self.lines_poly.SetPoints(self.points)
-        #self.lines_poly.SetLines(self.lines)
-        #self.lines_poly.GetCellData().SetScalars(self.line_colors)
         self.lines_poly.Modified()
 
-        self.line_id_array.add_ids(ids)
-        return ids
+        self.line_id_array.add_ids(mem_locations)
+
+        return mem_locations
 
     def del_all_lines(self):
         vtk_data = numpy_support.numpy_to_vtkIdTypeArray(np.array([], dtype=np.int64), deep=True)
@@ -89,23 +109,23 @@ class TimerCallback(object):
             for i in range(len(line_indices)):
                 loc = self.line_id_array.pop_id(line_indices[i])
 
-                np_new_data = np.concatenate([np_new_data,np_data[(last_loc+1)*3:loc*3]])
-                np_new_color_data = np.concatenate([np_new_color_data,np_color_data[(last_loc+1)*3:loc*3]])
+                np_new_data = np.concatenate([np_new_data, np_data[(last_loc + 1) * 3:loc * 3]])
+                np_new_color_data = np.concatenate([np_new_color_data, np_color_data[(last_loc + 1) * 3:loc * 3]])
 
                 last_loc = loc
 
             last_loc = loc
-            loc = len(np_data)/3
+            loc = len(np_data) / 3
 
             np_data = np.concatenate([np_new_data, np_data[(last_loc + 1) * 3:loc * 3]])
             np_color_data = np.concatenate([np_new_color_data, np_color_data[(last_loc + 1) * 3:loc * 3]])
 
         else:
             loc = self.line_id_array.pop_id(line_indices)
-            arr_1 = np_data[0:loc*3]
+            arr_1 = np_data[0:loc * 3]
             arr_2 = np_data[(loc + 1) * 3:len(np_data)]
             np_data = np.concatenate([arr_1, arr_2])
-            np_color_data = np.concatenate([np_color_data[0:loc*3], np_color_data[(loc + 1) * 3:len(np_color_data)]])
+            np_color_data = np.concatenate([np_color_data[0:loc * 3], np_color_data[(loc + 1) * 3:len(np_color_data)]])
 
         vtk_data = numpy_support.numpy_to_vtkIdTypeArray(np_data, deep=True)
         self.lines.SetCells(int(len(np_data) / 3), vtk_data)
@@ -114,7 +134,6 @@ class TimerCallback(object):
         self.line_colors.DeepCopy(vtk_data)
 
         self.lines_poly.Modified()
-
 
     def del_points(self, point_indices):
         if isinstance(point_indices, (tuple, list)):
@@ -133,7 +152,7 @@ class TimerCallback(object):
 
     def add_points(self, points, point_indices=None):
         # todo: keep array of no longer used point locations
-        ids=[]
+        ids = []
 
         if isinstance(points[0], (list, tuple)):
             if point_indices is not None:
@@ -177,19 +196,19 @@ class TimerCallback(object):
 
     def set_all_point_colors(self, color):
         np_color_data = numpy_support.vtk_to_numpy(self.point_colors)
-        np_color_data = np.tile(color, (np_color_data.shape[0],1))
+        np_color_data = np.tile(color, (np_color_data.shape[0], 1))
         vtk_data = numpy_support.numpy_to_vtk(num_array=np_color_data, deep=True, array_type=vtk.VTK_UNSIGNED_CHAR)
         self.point_colors.DeepCopy(vtk_data)
 
     def set_point_colors(self, colors, point_indices=None):
-        if point_indices==None:
+        if point_indices is not None:
             if isinstance(colors, (list, tuple)):
                 vtk_data = numpy_support.numpy_to_vtk(num_array=colors, deep=True, array_type=vtk.VTK_UNSIGNED_CHAR)
                 self.point_colors.DeepCopy(vtk_data)
             else:
                 r, g, b = colors
                 self.point_colors.SetTypedTuple(point_indices, [int(r % 255), int(g % 255), int(b % 255)])
-        elif isinstance(point_indices, (list, tuple,np.ndarray, np.generic)):
+        elif isinstance(point_indices, (list, tuple, np.ndarray, np.generic)):
             np_color_data = numpy_support.vtk_to_numpy(self.point_colors)
             np_color_data[point_indices] = colors
             vtk_data = numpy_support.numpy_to_vtk(num_array=np_color_data, deep=True, array_type=vtk.VTK_UNSIGNED_CHAR)
@@ -200,7 +219,7 @@ class TimerCallback(object):
 
     def setup_lerp_all_point_colors(self, color, fade_time):
         np_color_data = numpy_support.vtk_to_numpy(self.point_colors)
-        self.next_colors = np.tile(color, (np_color_data.shape[0],1))
+        self.next_colors = np.tile(color, (np_color_data.shape[0], 1))
         self.prev_colors = numpy_support.vtk_to_numpy(self.point_colors)
 
         self.lerp_fade_time = fade_time
@@ -208,12 +227,12 @@ class TimerCallback(object):
 
     def lerp_point_colors(self, colors, fade_time, point_indices=None):
         if isinstance(self.next_colors, (np.ndarray, np.generic)):
-            if isinstance(point_indices, (list, tuple,np.ndarray, np.generic)):
+            if isinstance(point_indices, (list, tuple, np.ndarray, np.generic)):
                 self.next_colors[point_indices] = colors
             else:
                 self.next_colors = colors
             self.next_color_indices = None
-        elif isinstance(point_indices, (list, tuple,np.ndarray, np.generic)) or isinstance(colors, (list, tuple)):
+        elif isinstance(point_indices, (list, tuple, np.ndarray, np.generic)) or isinstance(colors, (list, tuple)):
             if self.lerp_fade_time > 0:
                 self.next_colors = np.append(self.next_colors, colors)
                 if point_indices is not None:
@@ -221,9 +240,9 @@ class TimerCallback(object):
             else:
                 self.next_colors = colors
                 self.next_color_indices = point_indices
-                #must should not already be lerping
+                # must should not already be lerping
                 self.prev_colors = numpy_support.vtk_to_numpy(self.point_colors)
-        #fade time in seconds, float
+        # fade time in seconds, float
         self.lerp_fade_time = fade_time
         self.remaining_lerp_fade_time = fade_time
 
@@ -232,39 +251,40 @@ class TimerCallback(object):
 
     def _calculate_point_color_lerp(self):
 
-        #print(self.remaining_lerp_fade_time)
+        # print(self.remaining_lerp_fade_time)
 
-        if self.remaining_lerp_fade_time >0:
+        if self.remaining_lerp_fade_time > 0:
 
-            #print(self.lerp_fade_time, self.remaining_lerp_fade_time)
+            # print(self.lerp_fade_time, self.remaining_lerp_fade_time)
 
-            lerp_val = self.lerp_multiplier*(self.lerp_fade_time - self.remaining_lerp_fade_time)/self.lerp_fade_time
+            lerp_val = self.lerp_multiplier * (
+            self.lerp_fade_time - self.remaining_lerp_fade_time) / self.lerp_fade_time
 
-            #print(lerp_val)
+            # print(lerp_val)
 
-            diff_array = ( self.prev_colors - self.next_colors)
+            diff_array = (self.prev_colors - self.next_colors)
 
-            lerp_diff_array = diff_array*lerp_val
+            lerp_diff_array = diff_array * lerp_val
 
-            #print(lerp_diff_array)
+            # print(lerp_diff_array)
 
             lerp_colors = self.prev_colors - lerp_diff_array
 
-            #print(lerp_colors)
+            # print(lerp_colors)
 
             if isinstance(lerp_colors, (np.ndarray, np.generic)):
-                vtk_data = numpy_support.numpy_to_vtk(num_array=lerp_colors, deep=True, array_type=vtk.VTK_UNSIGNED_CHAR)
+                vtk_data = numpy_support.numpy_to_vtk(num_array=lerp_colors, deep=True,
+                                                      array_type=vtk.VTK_UNSIGNED_CHAR)
                 self.point_colors.DeepCopy(vtk_data)
 
             # self.points_poly.GetPointData().GetScalars().Modified()
             self.points_poly.Modified()
 
             self.remaining_lerp_fade_time -= self.loop_change_in_time
-            #print(self.remaining_lerp_fade_time)
-
+            # print(self.remaining_lerp_fade_time)
 
     def position_points(self, positions, point_indices=None):
-        if point_indices==None:
+        if point_indices == None:
             vtk_data = numpy_support.numpy_to_vtk(num_array=positions, deep=True, array_type=vtk.VTK_FLOAT)
             self.points.DeepCopy(vtk_data)
         elif isinstance(point_indices, (list, tuple)):
@@ -327,10 +347,10 @@ class KeyPressInteractorStyle(vtk.vtkInteractorStyleTrackballCamera):
         if parent is not None:
             global_interactor_parent = parent
 
-        #DO NOT REMOVE GLOBAL INSTANTIATIONS!
-        #due to problems with vtk losing data when moving python classes through c++, these globals muse be used to pass
+        # DO NOT REMOVE GLOBAL INSTANTIATIONS!
+        # due to problems with vtk losing data when moving python classes through c++, these globals muse be used to pass
         # data between class functions
-        #todo: try different python class types, such as inheriting from 'object' and defining class variables
+        # todo: try different python class types, such as inheriting from 'object' and defining class variables
 
         global global_camera
         global_camera = camera
@@ -370,7 +390,6 @@ class KeyPressInteractorStyle(vtk.vtkInteractorStyleTrackballCamera):
     def append_input_keydic(self, keydic):
         """Keydic must be a dictionary of vtk key strings containing either a keydic or a function"""
         global_keyDic.update(keydic)
-
 
     def _move_forward(self):
         # todo: change this to a velocity function with drag and let something else
@@ -434,7 +453,7 @@ class KeyPressInteractorStyle(vtk.vtkInteractorStyleTrackballCamera):
             except IndexError:
                 pass
             if i[-1] < len(global_keys_down):
-                i[-1]+=1
+                i[-1] += 1
             elif len(i) > 1:
                 i.pop()
                 key_dic.pop()
@@ -451,6 +470,7 @@ class KeyPressInteractorStyle(vtk.vtkInteractorStyleTrackballCamera):
     def keyRelease(self, obj, event):
         key = global_interactor_parent.GetKeySym()
         global_keys_down.remove(key)
+
 
 class PointDisplayer:
     # adapted from:
@@ -534,8 +554,8 @@ class PointDisplayer:
         render_window.AddRenderer(renderer)
         render_window_interactor = vtk.vtkRenderWindowInteractor()
         interactor_style = KeyPressInteractorStyle(camera=renderer.GetActiveCamera(),
-                                    render_window=render_window,
-                                    parent=render_window_interactor)
+                                                   render_window=render_window,
+                                                   parent=render_window_interactor)
         render_window_interactor.SetInteractorStyle(
             interactor_style
         )
@@ -552,14 +572,14 @@ class PointDisplayer:
         # calm blue sky = .1, .2, .4
         # day blue sky = .2, .4, .8
         # bright blue sky = .6, .8, 1.0 (bg attention activation)
-        renderer.SetBackground(66/255.0,132/255.0,125/255.0)  # todo:allow modification
+        renderer.SetBackground(66 / 255.0, 132 / 255.0, 125 / 255.0)  # todo:allow modification
 
         render_window.Render()
 
         render_window_interactor.Initialize()
 
         cb = self.callback_class(*self.callback_class_args, **self.callback_class_kwargs)
-        cb.interactor_style = interactor_style #allow adding/removing input functions
+        cb.interactor_style = interactor_style  # allow adding/removing input functions
         cb.renderer = renderer
         cb.points = self.points
         cb.points_poly = self.points_poly
@@ -690,7 +710,7 @@ def add_array(point_displayer, widths, normal, center, color):
         for y in range(-int(m.floor(widths[1] / 2.0)), int(m.ceil(widths[1] / 2.0))):
             for x in range(-int(m.floor(widths[0] / 2.0)), int(m.ceil(widths[0] / 2.0))):
                 vector_space_matrix = np.column_stack((np.transpose(xn), np.transpose(true_normal), np.transpose(zn)))
-                translation = np.matmul([x, y, z * 20], vector_space_matrix)
+                translation = np.matmul([x, y, z], vector_space_matrix)
                 point_location = [center[0], center[1], center[2]] + translation
                 point_displayer.add_point(point_location, color)
 
@@ -698,29 +718,33 @@ def add_array(point_displayer, widths, normal, center, color):
 def add_n_poly_prism(point_displayer, radius, normal, bottom_center, color):
     pass
 
+
 import random
 import colorsys
+
+
 class TestPointLoop(TimerCallback):
     def __init__(self):
-        #super().__init__()
+        # super().__init__()
         super(TestPointLoop, self).__init__()
 
     def loop(self, obj, event):
-        rand_points=[2, random.randint(0,40*40*2-1),random.randint(0,40*40*2-1)]
+        rand_points = [2, random.randint(0, 40 * 40 * 2 - 1), random.randint(0, 40 * 40 * 2 - 1)]
 
-        if len(self.line_id_array)>0 and random.randint(0,10)<9:
+        if len(self.line_id_array) > 0 and random.randint(0, 10) < 9:
             self.del_lines(0)
-        self.add_lines(rand_points, [128,99,21])
+        self.add_lines(rand_points, [128, 99, 21])
 
-        if random.randint(0,40)==1:
+        if random.randint(0, 40) == 1:
             self.del_all_lines()
             self.set_all_point_colors([int(128), int(66), int(21)])
 
-        rand_points = np.array([random.randint(0,40*40*2-1) for x in range(20)])
-        rand_colors = np.array([[ 85,36,0] for x in range(10)])
-        rand_colors = np.append( rand_colors, [([212,151,106])for x in range(10)], axis=0)
+        rand_points = np.array([random.randint(0, 40 * 40 * 2 - 1) for x in range(20)])
+        rand_colors = np.array([[85, 36, 0] for x in range(10)])
+        rand_colors = np.append(rand_colors, [([212, 151, 106]) for x in range(10)], axis=0)
 
         self.set_point_colors(rand_colors, rand_points)
+
 
 def display_test_point_loop():
     point_displayer = PointDisplayer(TestPointLoop)
@@ -728,24 +752,23 @@ def display_test_point_loop():
     point_displayer.set_poly_data()
     point_displayer.visualize()
 
-import numpy as np
 
 class TMVisualizer(TimerCallback):
     def __init__(self, tm, encoder):
         super(TMVisualizer, self).__init__()
         self.tm = tm
         self.encoder = encoder
-        self.i=0
-        self.j=0
-        self.columns = np.zeros((tm.columnDimensions[0],))
-        self.cells = np.zeros((tm.columnDimensions[0],tm.cellsPerColumn))
+        self.i = 0
+        self.j = 0
+        self.columns = np.zeros(np.multiply.reduce(tm.columnDimensions))
+        self.cells = np.zeros((np.multiply.reduce(tm.columnDimensions), tm.cellsPerColumn))
 
         self.change_time = .020
         self.current_time = time.clock()
 
         self.active_cell_color = [212, 151, 106]
         self.predicted_cell_color = [85, 36, 0]
-        self.winner_cell_color = [255,232,170]
+        self.winner_cell_color = [255, 232, 170]
         self.default_cell_color = [128, 66, 21]
 
         # show default cells will be added when I can add/remove points well
@@ -756,8 +779,7 @@ class TMVisualizer(TimerCallback):
         self.show_active_segments = False
         self.show_all_segments = False
 
-
-        self.set_lerp_remainder(.5)
+        self.set_lerp_remainder(0.5)
 
     def start(self):
         super(TMVisualizer, self).start()  # needed for getting called
@@ -770,8 +792,10 @@ class TMVisualizer(TimerCallback):
                                       'plus': self.speed_up,
                                       'minus': self.slow_down,
                                       's': self.toggle_show_active_segments,
-                                      'm':self.toggle_show_matching_segments,
+                                      'm': self.toggle_show_matching_segments,
                                       'Shift_L': {'exclam': self.toggle_show_all_segments}})
+
+        self.set_bg_color([30. / 255, 15. / 255, 0. / 255])
 
     def toggle_show_all_segments(self):
         self.show_all_segments = not self.show_all_segments
@@ -786,7 +810,7 @@ class TMVisualizer(TimerCallback):
         self.change_time = self.change_time + .01
 
     def speed_up(self):
-        self.change_time = max(self.change_time-.01, 0.02) # max 50 hz
+        self.change_time = max(self.change_time - .01, 0.02)  # max 50 hz
 
     def toggle_show_active_cells(self):
         self.show_active_cells = not self.show_active_cells
@@ -798,9 +822,9 @@ class TMVisualizer(TimerCallback):
         self.show_winner_cells = not self.show_winner_cells
 
     def set_active_cell_color(self, new_color):
-        assert(isinstance(new_color, (tuple, list, np.ndarray, np.generic)))
-        assert(len(new_color) == 3)
-        assert(isinstance(new_color[0], int))
+        assert (isinstance(new_color, (tuple, list, np.ndarray, np.generic)))
+        assert (len(new_color) == 3)
+        assert (isinstance(new_color[0], int))
         self.active_cell_color = new_color
 
     def set_predicted_cell_color(self, new_color):
@@ -844,7 +868,7 @@ class TMVisualizer(TimerCallback):
             self.lerp_point_colors(cell_colors, self.change_time, cells)
 
     def loop(self, obj, event):
-        super(TMVisualizer, self).loop(obj,event) #needed for lerping
+        super(TMVisualizer, self).loop(obj, event)  # needed for lerping
 
         if time.clock() - self.current_time > self.change_time:
 
@@ -855,7 +879,6 @@ class TMVisualizer(TimerCallback):
             if self.i % 256 == 0:
                 self.tm.reset()
                 self.i = 0
-
 
             self.setup_lerp_all_point_colors(self.default_cell_color, self.change_time)
             self.del_all_lines()
@@ -874,18 +897,19 @@ class TMVisualizer(TimerCallback):
                                     lambda s: colorsys.hls_to_rgb(0.200, .75 - s.permanence * .5, .5))
 
             if self.show_matching_segments:
-                self._show_segments(self.tm.getMatchingSegments(), lambda s: colorsys.hls_to_rgb(0.941, .75 - s.permanence * .5, .71))
+                self._show_segments(self.tm.getMatchingSegments(),
+                                    lambda s: colorsys.hls_to_rgb(0.941, .75 - s.permanence * .5, .71))
 
             if self.show_active_segments:
-                self._show_segments(self.tm.getActiveSegments(), lambda s: colorsys.hls_to_rgb(0.481, .75 - s.permanence * .5, .5))
+                self._show_segments(self.tm.getActiveSegments(),
+                                    lambda s: colorsys.hls_to_rgb(0.481, .75 - s.permanence * .5, .5))
 
-            self.i+=1
+            self.i += 1
 
             self.current_time = time.clock()
         else:
             pass
 
 
-
-if __name__=="__main__":
+if __name__ == "__main__":
     display_test_point_loop()

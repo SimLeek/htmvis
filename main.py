@@ -60,8 +60,13 @@ class ChoiceNumberEncoder(Encoder):
         if type(input) is float and math.isnan(input):
             input = SENTINEL_VALUE_FOR_MISSING_DATA
 
-        tmp_out = cn.nth_perm(input, self.on_bits, self.n)
-        output[:] = tmp_out[:]
+        if len(output)>self.n:
+            for j in range(int(len(output)/self.n)):
+                tmp_out = cn.nth_perm(input+j, self.on_bits, self.n, clamp=True)
+                output[j*self.n:(j+1)*self.n] = tmp_out[:]
+        else:
+            tmp_out = cn.nth_perm(input, self.on_bits, self.n)
+            output[:self.n] = tmp_out[:]
 
     def decode(self, encoded, parentFieldName=''):
         tmpOutput = numpy.array(encoded[:self.n] > 0).astype(encoded.dtype)
@@ -146,54 +151,30 @@ def formatRow(x):
 
 # Step 1: create Temporal Pooler instance with appropriate parameters
 
-tm = TM(columnDimensions=(24,),
+tm = TM(columnDimensions=(24,8),
         cellsPerColumn=4,
         initialPermanence=0.5,
         connectedPermanence=0.5,
-        minThreshold=2,
-        maxNewSynapseCount=150,
-        permanenceIncrement=0.5,
-        permanenceDecrement=0.2,
-        activationThreshold=2,
+        minThreshold=2*8,
+        maxNewSynapseCount=20,
+        permanenceIncrement=0.13,
+        permanenceDecrement=0.06,
+        activationThreshold=2*8,
         )
 
 mgc_e = ChoiceNumberEncoder()
 
 import htmvis
-import random
-import time
-
-
-
-
-
-
-# Step 3: send this simple sequence to the temporal memory for learning
-# We repeat the sequence 10 times
 
 point_displayer = htmvis.PointDisplayer(htmvis.TMVisualizer, tm, mgc_e)
-htmvis.add_array(point_displayer, [tm.cellsPerColumn, tm.columnDimensions[0], 1], [0, 1, 0], [0, 1, 0], [int(128), int(66), int(21)])
+
+if len(tm.columnDimensions)>1:
+    height = tm.columnDimensions[1]
+else:
+    height = 1
+
+htmvis.add_array(point_displayer, [tm.cellsPerColumn, tm.columnDimensions[0], height], [0, 1, 0], [0, 1, 0], [int(128), int(66), int(21)])
 point_displayer.set_poly_data()
 point_displayer.visualize()
 
-    # print "Raw input vector : " + formatRow(mgc_array)
 
-    # Send each vector to the TM, with learning turned off
-
-
-    # The following print statements prints out the active cells, predictive
-    # cells, active segments and winner cells.
-    #
-    # What you should notice is that the columns where active state is 1
-    # represent the SDR for the current input pattern and the columns where
-    # predicted state is 1 represent the SDR for the next expected pattern
-
-
-    # predictedCells[c][i] represents the state of the i'th cell in the c'th
-    # column. To see if a column is predicted, we can simply take the OR
-    # across all the cells in that column. In numpy we can do this by taking
-    # the max along axis 1.
-
-
-f.close()
-f_2.close()

@@ -65,7 +65,7 @@ class ChoiceNumberEncoder(Encoder):
                 tmp_out = cn.nth_perm(input+j, self.on_bits, self.n, clamp=True)
                 output[j*self.n:(j+1)*self.n] = tmp_out[:]
         else:
-            tmp_out = cn.nth_perm(input, self.on_bits, self.n)
+            tmp_out = cn.nth_perm(input, self.on_bits, self.n, clamp=True)
             output[:self.n] = tmp_out[:]
 
     def decode(self, encoded, parentFieldName=''):
@@ -151,15 +151,15 @@ def formatRow(x):
 
 # Step 1: create Temporal Pooler instance with appropriate parameters
 
-tm = TM(columnDimensions=(24,8),
+tm = TM(columnDimensions=(24,),
         cellsPerColumn=4,
         initialPermanence=0.5,
         connectedPermanence=0.5,
-        minThreshold=2*8,
+        minThreshold=2,
         maxNewSynapseCount=20,
         permanenceIncrement=0.13,
         permanenceDecrement=0.06,
-        activationThreshold=2*8,
+        activationThreshold=2,
         )
 
 mgc_e = ChoiceNumberEncoder()

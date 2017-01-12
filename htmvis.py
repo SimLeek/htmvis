@@ -759,7 +759,7 @@ class TMVisualizer(TimerCallback):
         self.tm = tm
         self.encoder = encoder
         self.i = 0
-        self.j = 0
+        self.j = 1.1
         self.columns = np.zeros(np.multiply.reduce(tm.columnDimensions))
         self.cells = np.zeros((np.multiply.reduce(tm.columnDimensions), tm.cellsPerColumn))
 
@@ -779,7 +779,7 @@ class TMVisualizer(TimerCallback):
         self.show_active_segments = False
         self.show_all_segments = False
 
-        self.set_lerp_remainder(0.5)
+        self.set_lerp_remainder(0.8)
 
     def start(self):
         super(TMVisualizer, self).start()  # needed for getting called
@@ -876,7 +876,11 @@ class TMVisualizer(TimerCallback):
             activeColumns = set([a for a, b in enumerate(self.columns) if b == 1])
             self.tm.compute(activeColumns, learn=True)
 
-            if self.i % 256 == 0:
+            if self.i >= 256:
+                if self.j >= 2:
+                    self.j = 1.1
+                else:
+                    self.j+=.1
                 self.tm.reset()
                 self.i = 0
 
@@ -904,7 +908,8 @@ class TMVisualizer(TimerCallback):
                 self._show_segments(self.tm.getActiveSegments(),
                                     lambda s: colorsys.hls_to_rgb(0.481, .75 - s.permanence * .5, .5))
 
-            self.i += 1
+            self.i = (self.i+1)**self.j
+            print(self.i)
 
             self.current_time = time.clock()
         else:

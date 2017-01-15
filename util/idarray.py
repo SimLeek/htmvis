@@ -2,6 +2,8 @@ import numpy as np
 
 class IdArray(object):
     # todo: use this to expand: people.idsia.ch
+    """A class used for sorting memory location for single point inserts.
+    For inserting large sets of points, this class will need to be modified."""
 
     def __init__(self):
         self.pointers = np.array([])
@@ -61,8 +63,6 @@ class IdArray(object):
         if id >= len(self.pointers):
             return None
 
-
-
         val = self.pointers[id]
         self.pointers[id] = -1
         self.free_pointers.add(id)
@@ -71,26 +71,4 @@ class IdArray(object):
         self.last_largest_id = max(self.last_largest_id-1, -1)
 
         return val
-
-if __name__ == '__main__':
-    arr = IdArray()
-
-    print(arr)
-
-    for i in range(10):
-        print(arr.add_id())
-
-    for i in range(2,5):
-        arr.del_id(i)
-
-    print(arr)
-
-    for i in range(10):
-        print(arr.add_id())
-
-    for i in range(7,9):
-        arr.del_id(i)
-
-    print(arr)
-
 

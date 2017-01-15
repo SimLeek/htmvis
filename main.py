@@ -152,13 +152,13 @@ def formatRow(x):
 # Step 1: create Temporal Pooler instance with appropriate parameters
 
 tm = TM(columnDimensions=(24,),
-        cellsPerColumn=4,
+        cellsPerColumn=6,
         initialPermanence=0.5,
         connectedPermanence=0.5,
         minThreshold=2,
         maxNewSynapseCount=20,
         permanenceIncrement=0.13,
-        permanenceDecrement=0.06,
+        permanenceDecrement=0.15,
         activationThreshold=2,
         )
 

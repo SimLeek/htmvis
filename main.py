@@ -2,6 +2,7 @@ from nupic.data import SENTINEL_VALUE_FOR_MISSING_DATA
 
 from nupic.data.fieldmeta import FieldMetaType
 from nupic.encoders.base import Encoder, EncoderResult
+from vtk_classes.vtk_displayer import VTKDisplayer
 
 import numbers
 import math
@@ -166,7 +167,7 @@ mgc_e = ChoiceNumberEncoder()
 
 import htmvis
 
-point_displayer = htmvis.PointDisplayer(htmvis.TMVisualizer, tm, mgc_e)
+point_displayer = VTKDisplayer(htmvis.TMVisualizer, tm, mgc_e)
 
 if len(tm.columnDimensions)>1:
     height = tm.columnDimensions[1]

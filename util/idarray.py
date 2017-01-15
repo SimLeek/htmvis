@@ -14,6 +14,10 @@ class IdArray(object):
         return self.pointers[id]
 
     def __repr__(self):
+        """
+        Prints out a string representation of this class and its variables, used with print function.
+        This is helpful for figuring out how this class works, as well as testing.
+        """
         str_out = "IdArray:\n"+\
         "\tPointer array:\t"+("\n\t\t" if len(self.pointers)>8 else "")+str(self.pointers)+"\n"+\
         "\tFree array locations:\t"+("\n\t\t" if len(self.free_pointers)>12 else "")+str(self.free_pointers)+"\n"+\

@@ -2,7 +2,8 @@ import random
 
 import numpy as np
 
-from htmvis import PointDisplayer, add_array
+from vtk_classes.vtk_displayer import VTKDisplayer
+from htmvis import add_array
 from vtk_classes.vtk_animation_timer_callback import VTKAnimationTimerCallback
 
 
@@ -101,10 +102,10 @@ def show_rand_line_cube(point_displayer):
         point_displayer.add_line(line_a[i], line_b[i], [r, g, b])
 
 
-class TestPointLoop(VTKAnimationTimerCallback):
+class PointLineTester(VTKAnimationTimerCallback):
     def __init__(self):
         # super().__init__()
-        super(TestPointLoop, self).__init__()
+        super(PointLineTester, self).__init__()
 
     def loop(self, obj, event):
         rand_points = [2, random.randint(0, 40 * 40 * 2 - 1), random.randint(0, 40 * 40 * 2 - 1)]
@@ -112,6 +113,8 @@ class TestPointLoop(VTKAnimationTimerCallback):
         if len(self.line_id_array) > 0 and random.randint(0, 10) < 9:
             self.del_lines(0)
         self.add_lines(rand_points, [128, 99, 21])
+
+        self.add_points([[random.randint(-50,50),random.randint(-50,50),random.randint(-50,50)]],[[0,0,0]])
 
         if random.randint(0, 40) == 1:
             self.del_all_lines()
@@ -125,7 +128,10 @@ class TestPointLoop(VTKAnimationTimerCallback):
 
 
 def display_test_point_loop():
-    point_displayer = PointDisplayer(TestPointLoop)
+    point_displayer = VTKDisplayer(PointLineTester)
     add_array(point_displayer, [40, 40, 2], [0, 1, 0], [0, 1, 0], [int(128), int(66), int(21)])
     point_displayer.set_poly_data()
     point_displayer.visualize()
+
+if __name__ == '__main__':
+    display_test_point_loop()

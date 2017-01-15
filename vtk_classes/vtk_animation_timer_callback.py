@@ -106,10 +106,10 @@ class VTKAnimationTimerCallback(object):
 
         else:
             loc = self.line_id_array.pop_id(line_indices)
-            arr_1 = np_data[0:loc * 3]
-            arr_2 = np_data[(loc + 1) * 3:len(np_data)]
+            arr_1 = np_data[0:int(loc) * 3]
+            arr_2 = np_data[(int(loc) + 1) * 3:len(np_data)]
             np_data = np.concatenate([arr_1, arr_2])
-            np_color_data = np.concatenate([np_color_data[0:loc * 3], np_color_data[(loc + 1) * 3:len(np_color_data)]])
+            np_color_data = np.concatenate([np_color_data[0:int(loc) * 3], np_color_data[(int(loc) + 1) * 3:len(np_color_data)]])
 
         vtk_data = numpy_support.numpy_to_vtkIdTypeArray(np_data, deep=True)
         self.lines.SetCells(int(len(np_data) / 3), vtk_data)
@@ -129,7 +129,8 @@ class VTKAnimationTimerCallback(object):
         """
         raise NotImplementedError("Not implemented yet. Functionality must be figured from line deletion function.")
 
-    def add_points(self, points, point_indices=None):
+
+    def add_points(self, points, point_colors):
         #Todo: unit test this
         """
         Untested. Currently, adding points is done via the add_array function.
@@ -141,29 +142,50 @@ class VTKAnimationTimerCallback(object):
         Returns:
 
         """
-        ids = []
-        print(points,point_indices)
+        assert (isinstance(points, (list, tuple, np.ndarray, np.generic)))
+        assert (isinstance(point_colors, (list, tuple, np.ndarray, np.generic)))
 
-        if isinstance(points[0], (list, tuple)):
-            if point_indices is not None:
-                for i in range(len(points)):
-                    ids.append(self.points.InsertPoint(point_indices[i], points[i]))
-            else:
-                for i in range(len(points)):
-                    if len(self.unused_locations) > 0:
-                        ids.append(self.unused_locations.pop(0))
-                        self.points.SetPoint(ids[-1], points[i])
-                    else:
-                        ids.append(self.points.InsertNextPoint(points[i]))
+        np_point_data = numpy_support.vtk_to_numpy(self.points.GetData())
+        np_point_color_data = numpy_support.vtk_to_numpy(self.point_colors)
+        np_vert_data = numpy_support.vtk_to_numpy(self.point_vertices.GetData())
+
+        for i in range(len(points)):
+            np_vert_data = np.append(np_vert_data,[1, len(np_vert_data)/2])
+
+        # todo: add lines in unused locations if possible
+        mem_locations = range(int(len(np_point_data) / 3), int((len(np_point_data) + len(points)) / 3))
+
+        if len(np_point_data) > 0:
+            np_point_data = np.append(np_point_data, points, axis=0)
         else:
-            if len(self.unused_locations) > 0:
-                ids.append(self.unused_locations.pop(0))
-                self.points.SetPoint(ids[-1], points)
-            else:
-                ids.append(self.points.InsertNextPoint(points))
+            np_point_data = points
+
+        if len(np_point_color_data) > 0:
+            np_point_color_data = np.append(np_point_color_data, point_colors, axis=0)
+        else:
+            np_point_color_data = point_colors
+
+        vtk_point_data = numpy_support.numpy_to_vtk(num_array=np_point_data, deep=True, array_type=vtk.VTK_FLOAT)
+
+        self.points.SetData(vtk_point_data)
+
+        vtk_cell_data = numpy_support.numpy_to_vtkIdTypeArray(np_vert_data)
+
+        self.point_vertices.UpdateCellCount(len(np_vert_data) / 2)
+        #self.point_vertices.SetNumberOfCells(len(np_vert_data) / 2) # works if you check the print of vtk_cell_data,
+        #  but isn't useful
+        self.point_vertices.GetData().DeepCopy(vtk_cell_data)
+
+
+        vtk_point_color_data = numpy_support.numpy_to_vtk(num_array=np_point_color_data,
+                                                         deep=True, array_type=vtk.VTK_UNSIGNED_CHAR)
+        self.point_colors.DeepCopy(vtk_point_color_data)
+
         self.points_poly.Modified()
 
-        return ids
+        self.point_id_array.add_ids(mem_locations)
+
+        return mem_locations
 
     def set_bg_color(self, color):
         r, g, b = color
@@ -191,13 +213,10 @@ class VTKAnimationTimerCallback(object):
         self.point_colors.DeepCopy(vtk_data)
 
     def set_point_colors(self, colors, point_indices=None):
-        if point_indices is not None:
-            if isinstance(colors, (list, tuple)):
+        if point_indices is None:
+            if isinstance(colors, (list, tuple, np.ndarray, np.generic)):
                 vtk_data = numpy_support.numpy_to_vtk(num_array=colors, deep=True, array_type=vtk.VTK_UNSIGNED_CHAR)
                 self.point_colors.DeepCopy(vtk_data)
-            else:
-                r, g, b = colors
-                self.point_colors.SetTypedTuple(point_indices, [int(r % 255), int(g % 255), int(b % 255)])
         elif isinstance(point_indices, (list, tuple, np.ndarray, np.generic)):
             np_color_data = numpy_support.vtk_to_numpy(self.point_colors)
             np_color_data[point_indices] = colors
@@ -345,6 +364,7 @@ class VTKAnimationTimerCallback(object):
         self.remaining_lerp_fade_time = 0
         self.lerp_multiplier = 1
         self.line_id_array = IdArray()
+        self.point_id_array = IdArray()
 
     def start(self):
         """

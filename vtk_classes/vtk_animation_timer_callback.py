@@ -14,7 +14,22 @@ class VTKAnimationTimerCallback(object):
     __slots__ = ["points", "point_colors", "timer_count", "points_poly",
                  "lines", "lines_poly", "line_colors", "line_id_array"
                                                        "last_velocity_update", "unused_locations",
-                 "last_color_velocity_update", "renderer", "last_bg_color_velocity_update"]
+                 "last_color_velocity_update", "renderer", "last_bg_color_velocity_update",
+                 "last_velocity_update", "_loop_time", "remaining_lerp_fade_time", "lerp_multiplier",
+                 "line_id_array", "point_id_array", "point_vertices", "interactor_style", "renderer",
+                 ]
+
+    def __init__(self):
+        self.timer_count = 0
+        self.last_velocity_update = time.clock()
+        self.last_color_velocity_update = time.clock()
+        self.last_bg_color_velocity_update = time.clock()
+        self._loop_time = time.clock()
+        self.unused_locations = []
+        self.remaining_lerp_fade_time = 0
+        self.lerp_multiplier = 1
+        self.line_id_array = IdArray()
+        self.point_id_array = IdArray()
 
     def add_lines(self, lines, line_colors):
         """
@@ -153,7 +168,7 @@ class VTKAnimationTimerCallback(object):
             np_vert_data = np.append(np_vert_data,[1, len(np_vert_data)/2])
 
         # todo: add lines in unused locations if possible
-        mem_locations = range(int(len(np_point_data) / 3), int((len(np_point_data) + len(points)) / 3))
+        mem_locations = range(int(len(np_point_data)), int((len(np_point_data) + len(points))))
 
         if len(np_point_data) > 0:
             np_point_data = np.append(np_point_data, points, axis=0)
@@ -169,13 +184,12 @@ class VTKAnimationTimerCallback(object):
 
         self.points.SetData(vtk_point_data)
 
-        vtk_cell_data = numpy_support.numpy_to_vtkIdTypeArray(np_vert_data)
-
-        self.point_vertices.UpdateCellCount(len(np_vert_data) / 2)
-        #self.point_vertices.SetNumberOfCells(len(np_vert_data) / 2) # works if you check the print of vtk_cell_data,
+        #self.point_vertices.SetNumberOfCells(len(np_vert_data) / 2)
+        #self.point_vertices.UpdateCellCount(len(np_vert_data) / 2)
+         # works if you check the print of vtk_cell_data,
         #  but isn't useful
-        self.point_vertices.GetData().DeepCopy(vtk_cell_data)
-
+        vtk_data = numpy_support.numpy_to_vtkIdTypeArray(np_vert_data, deep=True)
+        self.point_vertices.SetCells(int(len(np_vert_data) / 2), vtk_data)
 
         vtk_point_color_data = numpy_support.numpy_to_vtk(num_array=np_point_color_data,
                                                          deep=True, array_type=vtk.VTK_UNSIGNED_CHAR)
@@ -354,24 +368,13 @@ class VTKAnimationTimerCallback(object):
         """
         self.interactor_style.append_input_keydic(keydic)
 
-    def __init__(self):
-        self.timer_count = 0
-        self.last_velocity_update = time.clock()
-        self.last_color_velocity_update = time.clock()
-        self.last_bg_color_velocity_update = time.clock()
-        self._loop_time = time.clock()
-        self.unused_locations = []
-        self.remaining_lerp_fade_time = 0
-        self.lerp_multiplier = 1
-        self.line_id_array = IdArray()
-        self.point_id_array = IdArray()
-
     def start(self):
         """
         Function to be run after class instantiation and vtk start up. Useful for setting things that can only be set
         after VTK is running.
         """
         pass
+
 
     def loop(self, obj, event):
         """

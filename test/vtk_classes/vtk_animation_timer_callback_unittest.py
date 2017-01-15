@@ -1,18 +1,23 @@
 from vtk_classes.vtk_animation_timer_callback import VTKAnimationTimerCallback
+from vtk_classes.vtk_displayer import VTKDisplayer
 import unittest
+import random
 
 class TestIdArray(unittest.TestCase):
 
-    def test_add_del(self):
-        point_displayer = vtk_classes.VTKDisplayer(htmvis.TMVisualizer, tm, mgc_e)
+    def test_add(self):
 
-        if len(tm.columnDimensions) > 1:
-            height = tm.columnDimensions[1]
-        else:
-            height = 1
+        class AddTester(VTKAnimationTimerCallback):
+            def __init__(self):
+                super(AddTester, self).__init__()
 
-        htmvis.add_array(point_displayer, [tm.cellsPerColumn, tm.columnDimensions[0], height], [0, 1, 0], [0, 1, 0],
-                         [int(128), int(66), int(21)])
+            def loop(self, obj, event):
+                super(AddTester, self).loop(obj, event)
+                self.add_points([[random.randint(-50, 50), random.randint(-50, 50), random.randint(-50, 50)]],
+                                [[0, 0, 0]])
+                pass
+        point_displayer = VTKDisplayer(AddTester)
+        point_displayer.add_point([0,0,0],[0,0,0])
         point_displayer.set_poly_data()
         point_displayer.visualize()
 

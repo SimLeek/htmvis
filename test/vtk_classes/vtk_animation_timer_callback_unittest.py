@@ -21,7 +21,7 @@ class TimedAnimationTester(VTKAnimationTimerCallback):
             self.exit()
         pass
 
-class TestIdArray(unittest.TestCase):
+class TestAnimationTimerCallback(unittest.TestCase):
 
     def test_point_add(self):
 
@@ -56,5 +56,28 @@ class TestIdArray(unittest.TestCase):
         line_displayer = VTKDisplayer(PointFieldTester)
         line_displayer.visualize()
 
+    def test_set_point_colors(self):
+        class PointColorSetTester(TimedAnimationTester):
+            def at_start(self):
+                self.add_point_field([20, 20, 2], [0, 1, 0], [0, 1, 0], [[int(128), int(66), int(21)]])
+            def loop(self, obj, event):
+                super(PointColorSetTester, self).loop(obj, event)
+
+        line_displayer = VTKDisplayer(PointColorSetTester)
+        line_displayer.visualize()
+
+def suite():
+    suite = unittest.TestSuite()
+    suite.addTest(TestAnimationTimerCallback("test_set_point_colors"))
+    return suite
+
 if __name__ == '__main__':
-    unittest.main()
+    res = unittest.TestResult()
+    suite_to_run = suite()
+    suite_to_run.run(res)
+    print(res)
+    print(res.errors)
+    print(res.failures)
+    print(res.skipped)
+    #unittest.main()
+

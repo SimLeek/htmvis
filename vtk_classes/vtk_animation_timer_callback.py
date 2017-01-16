@@ -7,6 +7,8 @@ from vtk.util import numpy_support
 from util.basic_util import clamp
 from util.idarray import IdArray
 
+from util.numpy_helpers import normalize
+import math as m
 
 class VTKAnimationTimerCallback(object):
     """This class is called every few milliseconds by VTK based on the set frame rate. This allows for animation.
@@ -17,6 +19,7 @@ class VTKAnimationTimerCallback(object):
                  "last_color_velocity_update", "renderer", "last_bg_color_velocity_update",
                  "last_velocity_update", "_loop_time", "remaining_lerp_fade_time", "lerp_multiplier",
                  "line_id_array", "point_id_array", "point_vertices", "interactor_style", "renderer",
+                 "interactive_renderer", "_started"
                  ]
 
     def __init__(self):
@@ -30,6 +33,7 @@ class VTKAnimationTimerCallback(object):
         self.lerp_multiplier = 1
         self.line_id_array = IdArray()
         self.point_id_array = IdArray()
+        self._started=False
 
     def add_lines(self, lines, line_colors):
         """
@@ -175,6 +179,10 @@ class VTKAnimationTimerCallback(object):
         else:
             np_point_data = points
 
+        if len(point_colors) ==1:
+            points = np.array(points)
+            point_colors = np.tile(point_colors, (points.shape[0], 1))
+
         if len(np_point_color_data) > 0:
             np_point_color_data = np.append(np_point_color_data, point_colors, axis=0)
         else:
@@ -200,6 +208,30 @@ class VTKAnimationTimerCallback(object):
         self.point_id_array.add_ids(mem_locations)
 
         return mem_locations
+
+    def add_point_field(self, widths, normal, center, color):
+        true_normal = normalize(normal)
+        if not np.allclose(true_normal, [1, 0, 0]):
+            zn = np.cross(true_normal, [1, 0, 0])
+            xn = np.cross(true_normal, zn)
+        else:
+            xn = [1, 0, 0]
+            zn = [0, 0, 1]
+        point_field = np.array([])
+        #todo: replace for loops with numpy or gpu ops
+        for z in range(-int(m.floor(widths[2] / 2.0)), int(m.ceil(widths[2] / 2.0))):
+            for y in range(-int(m.floor(widths[1] / 2.0)), int(m.ceil(widths[1] / 2.0))):
+                for x in range(-int(m.floor(widths[0] / 2.0)), int(m.ceil(widths[0] / 2.0))):
+                    vector_space_matrix = np.column_stack(
+                        (np.transpose(xn), np.transpose(true_normal), np.transpose(zn)))
+                    translation = np.matmul([x, y, z], vector_space_matrix)
+                    point_location = [center[0], center[1], center[2]] + translation
+                    point_location = [point_location]
+                    if len(point_field)>0:
+                        point_field = np.append(point_field, point_location, axis = 0)
+                    else:
+                        point_field = point_location
+        return self.add_points(point_field, color) #returns ids
 
     def set_bg_color(self, color):
         r, g, b = color
@@ -368,7 +400,7 @@ class VTKAnimationTimerCallback(object):
         """
         self.interactor_style.append_input_keydic(keydic)
 
-    def start(self):
+    def at_start(self):
         """
         Function to be run after class instantiation and vtk start up. Useful for setting things that can only be set
         after VTK is running.
@@ -390,11 +422,16 @@ class VTKAnimationTimerCallback(object):
         self._calculate_point_color_lerp()
         pass
 
-    def end(self):
+    def at_end(self):
         """
         Function called when animation is ended.
         """
-        pass
+        self.interactive_renderer.RemoveAllObservers()
+
+    def exit(self):
+        # needed to stop previous setups from being run on next class call
+        # proper cleanup
+        self.interactive_renderer.TerminateApp()
 
     def execute(self, obj, event):
         """
@@ -404,11 +441,14 @@ class VTKAnimationTimerCallback(object):
             obj ():
             event ():
         """
-        self.start()
+        if not self._started:
+            self.at_start()
+            self._started = True
+
         self.loop(obj, event)
 
         self.points_poly.GetPointData().GetScalars().Modified()
         self.points_poly.Modified()
 
-        interactive_renderer = obj
-        interactive_renderer.GetRenderWindow().Render()
+        self.interactive_renderer = obj
+        self.interactive_renderer.GetRenderWindow().Render()

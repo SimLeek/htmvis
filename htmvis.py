@@ -6,27 +6,7 @@ import time
 
 import numpy as np
 
-from util.numpy_helpers import normalize
 from vtk_classes.vtk_animation_timer_callback import VTKAnimationTimerCallback
-
-
-def add_array(point_displayer, widths, normal, center, color):
-    true_normal = normalize(normal)
-    if not np.allclose(true_normal, [1, 0, 0]):
-        zn = np.cross(true_normal, [1, 0, 0])
-        xn = np.cross(true_normal, zn)
-    else:
-        xn = [1, 0, 0]
-        zn = [0, 0, 1]
-    for z in range(-int(m.floor(widths[2] / 2.0)), int(m.ceil(widths[2] / 2.0))):
-        for y in range(-int(m.floor(widths[1] / 2.0)), int(m.ceil(widths[1] / 2.0))):
-            for x in range(-int(m.floor(widths[0] / 2.0)), int(m.ceil(widths[0] / 2.0))):
-                vector_space_matrix = np.column_stack((np.transpose(xn), np.transpose(true_normal), np.transpose(zn)))
-                translation = np.matmul([x, y, z], vector_space_matrix)
-                point_location = [center[0], center[1], center[2]] + translation
-                print(point_location)
-                point_displayer.add_point(point_location, color)
-
 
 def add_n_poly_prism(point_displayer, radius, normal, bottom_center, color):
     pass
@@ -63,8 +43,16 @@ class TMVisualizer(VTKAnimationTimerCallback):
 
         self.set_lerp_remainder(0.6)
 
-    def start(self):
-        super(TMVisualizer, self).start()  # needed for getting called
+    def at_start(self):
+        super(TMVisualizer, self).at_start()  # needed for getting called
+
+        if len(self.tm.columnDimensions) > 1:
+            height = self.tm.columnDimensions[1]
+        else:
+            height = 1
+
+        self.add_point_field([self.tm.cellsPerColumn, self.tm.columnDimensions[0], height], [0, 1, 0], [0, 1, 0],
+                         [[int(128), int(66), int(21)]])
 
         # this needs to be put in start rather than init because the key interactor
         # is added after initialization
@@ -192,7 +180,6 @@ class TMVisualizer(VTKAnimationTimerCallback):
                                     lambda s: colorsys.hls_to_rgb(0.481, .75 - s.permanence * .5, .5))
 
             self.i = (self.i+1)**self.j
-            print(self.i)
 
             self.current_time = time.clock()
         else:

@@ -1,4 +1,5 @@
 import vtk
+from vtk.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
 
 from vtk_classes.vtk_animation_timer_callback import VTKAnimationTimerCallback
 from vtk_classes.vtk_keypress_interactor_style import VTKKeyPressInteractorStyle
@@ -26,51 +27,9 @@ class VTKDisplayer:
         self.callback_class_args = args
         self.callback_class_kwargs = kwargs
 
-    # def add_point(self, x, y, z):
-    #    point = [x,y,z]
-    #    self.add_point(point)
+        self._set_poly_data()
 
-    def add_point(self, point, color):
-        """
-        Used to add points before animation is running.
-
-        Args:
-            point ():
-            color ():
-
-        Returns:
-
-        """
-        point_id = self.points.InsertNextPoint(point)
-        self.vertices.InsertNextCell(1)
-        self.vertices.InsertCellPoint(point_id)
-
-        self.point_colors.InsertNextTypedTuple(color)
-
-        return point_id
-
-    def add_line(self, point_a_index, point_b_index, color):
-        """
-        Used to add lines before animation is running.
-
-        Args:
-            point_a_index ():
-            point_b_index ():
-            color ():
-
-        Returns:
-
-        """
-        line = vtk.vtkLine()
-        line.GetPointIds().SetId(0, point_a_index)
-        line.GetPointIds().SetId(1, point_b_index)
-
-        line_id = self.lines.InsertNextCell(line)
-
-        self.line_colors.InsertNextTypedTuple(color)
-        return line_id
-
-    def set_poly_data(self):
+    def _set_poly_data(self):
 
         self.points_poly = vtk.vtkPolyData()
         self.points_poly.SetPoints(self.points)
@@ -147,5 +106,5 @@ class VTKDisplayer:
         timer_id = render_window_interactor.CreateRepeatingTimer(10)
         render_window_interactor.Start()
 
-        # after loop
-        cb.end()
+        # cleanup after loop
+        cb.at_end()

@@ -21,23 +21,4 @@ def nth_middle(n, min_val, max_val):
     middle = min_val + node*section_size + section_size/2
     return middle
 
-#Simple testing. Unittest would be a bit much for these functions.
-if __name__ == "__main__":
-    #minmax test:
-    print(minmax(5,2,7), 5)
-    try:
-        print(minmax(5, -2, -7), False)
-    except AssertionError:
-        print("failed correctly")
-    print(minmax(5, -7, -2), -2)
-    print(minmax(5, 6, 7), 6)
-    print(minmax(5, 2, 3), 3)
-
-    #nth_middle test:
-    print(nth_middle(0, 0, 10), 5)
-    print(nth_middle(1, 0, 10), 2.5)
-    print(nth_middle(2, 0, 10), 7.5)
-    for i in range(1000):
-        print(nth_middle(i, 0, 10))
-
 

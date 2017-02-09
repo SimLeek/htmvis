@@ -92,12 +92,12 @@ class VTKAnimationTimerCallback(object):
         self.lines_poly.Modified()
 
     def del_lines(self, line_indices):
-        # Todo: unit test this
+        #todo: change idarray to use tuples of (start,end) locations and set this to delete those partitions
         """
-        Delete specific lines. (UNTESTED)
+        Delete specific lines.
 
         Args:
-            line_indices (tuple, list, np.ndarray, np.generic, int):
+            line_indices (tuple, list, np.ndarray, np.generic):
                 An array of integers or a single integer representing line memory locations(s) to delete.
         """
         np_data = numpy_support.vtk_to_numpy(self.lines.GetData())
@@ -111,24 +111,32 @@ class VTKAnimationTimerCallback(object):
             np_new_color_data = []
             for i in range(len(line_indices)):
                 loc = self.line_id_array.pop_id(line_indices[i])
+                if loc==None:
+                    #todo: put warning here
+                    continue
 
-                np_new_data = np.concatenate([np_new_data, np_data[(last_loc + 1) * 3:loc * 3]])
-                np_new_color_data = np.concatenate([np_new_color_data, np_color_data[(last_loc + 1) * 3:loc * 3]])
+                if len(np_new_data) > 0:
+                    np_new_data = np.append(np_new_data, np_data[(last_loc + 1) * 3:loc * 3], axis=0)
+                else:
+                    np_new_data = np_data[(last_loc + 1) * 3:loc * 3]
+
+                if len(np_new_color_data) > 0:
+                    np_new_color_data = np.append(np_new_color_data, np_color_data[(last_loc + 1):loc], axis=0)
+                else:
+                    np_new_color_data = np_color_data[(last_loc + 1):loc]
 
                 last_loc = loc
 
             last_loc = loc
             loc = len(np_data) / 3
 
-            np_data = np.concatenate([np_new_data, np_data[(last_loc + 1) * 3:loc * 3]])
-            np_color_data = np.concatenate([np_new_color_data, np_color_data[(last_loc + 1) * 3:loc * 3]])
+            np_data = np.append(np_new_data, np_data[(last_loc + 1) * 3:loc * 3], axis=0)
 
+            np_data = np_data.astype(np.int64)
+
+            np_color_data = np.append(np_new_color_data, np_color_data[(last_loc + 1):loc], axis=0)
         else:
-            loc = self.line_id_array.pop_id(line_indices)
-            arr_1 = np_data[0:int(loc) * 3]
-            arr_2 = np_data[(int(loc) + 1) * 3:len(np_data)]
-            np_data = np.concatenate([arr_1, arr_2])
-            np_color_data = np.concatenate([np_color_data[0:int(loc) * 3], np_color_data[(int(loc) + 1) * 3:len(np_color_data)]])
+            raise TypeError("Deletion list should be tuple, list, np.ndarray, or np.generic")
 
         vtk_data = numpy_support.numpy_to_vtkIdTypeArray(np_data, deep=True)
         self.lines.SetCells(int(len(np_data) / 3), vtk_data)
@@ -143,20 +151,83 @@ class VTKAnimationTimerCallback(object):
         Delete specific points.
 
         Args:
-            point_indices (tuple, list, np.ndarray, np.generic, int):
+            point_indices (tuple, list, np.ndarray, np.generic):
                 An array of integers or a single integer representing point memory locations(s) to delete.
         """
-        raise NotImplementedError("Not implemented yet. Functionality must be figured from line deletion function.")
+        np_point_data = numpy_support.vtk_to_numpy(self.points.GetData())
+        np_point_color_data = numpy_support.vtk_to_numpy(self.point_colors)
+        np_vert_data = numpy_support.vtk_to_numpy(self.point_vertices.GetData())#1,1,1,2,1,3,1,4,1,5,1,6...
 
+        print(len(np_vert_data), len(np_point_data), len(np_point_color_data))
+
+        if isinstance(point_indices, (tuple, list, np.ndarray, np.generic)):
+            last_loc = -1
+            loc = 0
+            subtractor = 0
+            np_new_data = []
+            np_new_color_data = []
+            np_new_verts = []
+            for i in range(len(point_indices)):
+                loc = self.point_id_array.pop_id(point_indices[i])
+                if loc == None:
+                    # todo: put warning here
+                    continue
+
+                subtractor+=1
+
+                #I could just remove the end of the array, but this keeps the lines attached to the same points
+                if len(np_new_verts) >0:
+                    np_new_verts = np.append(np_new_verts, np_vert_data[(last_loc+1)*2:loc*2], axis = 0)
+                else:
+                    np_new_verts = np_vert_data[(last_loc+1)*2: loc*2]
+
+                if len(np_new_data) > 0:
+                    np_new_data = np.append(np_new_data, np_point_data[(last_loc + 1):loc], axis=0)
+                else:
+                    np_new_data = np_point_data[(last_loc + 1):loc]
+
+                if len(np_new_color_data) > 0:
+                    np_new_color_data = np.append(np_new_color_data, np_point_color_data[(last_loc + 1)*3:loc*3], axis=0)
+                else:
+                    np_new_color_data = np_point_color_data[(last_loc + 1):loc]
+
+                last_loc = loc
+
+            if loc == None:
+                return
+
+            last_loc = loc
+            loc = len(np_point_data)
+
+            np_point_data = np.append(np_new_data, np_point_data[(last_loc + 1):loc], axis=0)
+
+            np_point_color_data = np.append(np_new_color_data, np_point_color_data[(last_loc + 1):loc], axis=0)
+
+            np_vert_data = np.append(np_new_verts, np_vert_data[(last_loc + 1)*2:loc*2], axis = 0)
+        else:
+            raise TypeError("Deletion list should be tuple, list, np.ndarray, or np.generic")
+
+        vtk_data = numpy_support.numpy_to_vtk(np_point_data, deep=True)
+        self.points.SetData(vtk_data)
+
+        vtk_data = numpy_support.numpy_to_vtk(num_array=np_point_color_data, deep=True, array_type=vtk.VTK_UNSIGNED_CHAR)
+        self.point_colors.DeepCopy(vtk_data)
+
+        vtk_data = numpy_support.numpy_to_vtkIdTypeArray(np_vert_data, deep=True)
+        self.point_vertices.SetCells(int(len(np_vert_data) / 2), vtk_data)
+
+        self.lines_poly.Modified()
 
     def add_points(self, points, point_colors):
-        #Todo: unit test this
         """
-        Untested. Currently, adding points is done via the add_array function.
+        Adds points in 3d space.
 
         Args:
-            points ():
-            point_indices ():
+            points (tuple, list, np.ndarray, np.generic):
+                An array in the format of [[x1,y1,z1], [x2,y2,x2], ..., [xn,yn,zn]]
+            point_colors (tuple, list, np.ndarray, np.generic):
+                An array in the format of [[r1, g1, b1], [r2, g2, b2], ...], with the same length as the number of
+                  points to be added.
 
         Returns:
 
@@ -168,10 +239,15 @@ class VTKAnimationTimerCallback(object):
         np_point_color_data = numpy_support.vtk_to_numpy(self.point_colors)
         np_vert_data = numpy_support.vtk_to_numpy(self.point_vertices.GetData())
 
-        for i in range(len(points)):
-            np_vert_data = np.append(np_vert_data,[1, len(np_vert_data)/2])
+        print(np_vert_data)
 
-        # todo: add lines in unused locations if possible
+        for i in range(len(points)):
+            #todo: modify pointer_id_array to set free pointers to deleted data, not deleted data locations
+            if len(self.point_id_array.free_pointers)>0:
+                np_vert_data = np.append(np_vert_data, [1,self.point_id_array.free_pointers.pop()])
+            else:
+                np_vert_data = np.append(np_vert_data,[1, len(np_vert_data)/2])
+
         mem_locations = range(int(len(np_point_data)), int((len(np_point_data) + len(points))))
 
         if len(np_point_data) > 0:
@@ -192,10 +268,7 @@ class VTKAnimationTimerCallback(object):
 
         self.points.SetData(vtk_point_data)
 
-        #self.point_vertices.SetNumberOfCells(len(np_vert_data) / 2)
-        #self.point_vertices.UpdateCellCount(len(np_vert_data) / 2)
-         # works if you check the print of vtk_cell_data,
-        #  but isn't useful
+
         vtk_data = numpy_support.numpy_to_vtkIdTypeArray(np_vert_data, deep=True)
         self.point_vertices.SetCells(int(len(np_vert_data) / 2), vtk_data)
 
@@ -206,10 +279,25 @@ class VTKAnimationTimerCallback(object):
         self.points_poly.Modified()
 
         self.point_id_array.add_ids(mem_locations)
+        #print(self.point_id_array)
 
         return mem_locations
 
     def add_point_field(self, widths, normal, center, color):
+        """
+        Adds a rectangular field of points.
+        Args:
+            widths (tuple, list, np.ndarray, np.generic):  an array defining the widths of each dimension of the field.
+            normal (tuple, list, np.ndarray, np.generic): an array defining the normal to the field. Specifies angle.
+            center (tuple, list, np.ndarray, np.generic): an array defining the central position of the field.
+            color (tuple, list, np.ndarray, np.generic):
+                An array in the format of [[r1, g1, b1], [r2, g2, b2], ...], with the same length as the number of
+                  points to be added, or a single color in the form of [[r1, g1, b1]].
+
+        Returns:
+            A list of integers representing the memory locations where the points were added.
+
+        """
         true_normal = normalize(normal)
         if not np.allclose(true_normal, [1, 0, 0]):
             zn = np.cross(true_normal, [1, 0, 0])
@@ -234,25 +322,24 @@ class VTKAnimationTimerCallback(object):
         return self.add_points(point_field, color) #returns ids
 
     def set_bg_color(self, color):
-        r, g, b = color
+        """
+        Sets the background color of the viewport.
+
+        Args:
+            color (tuple, list, np.ndarray, np.generic): a single rgb color in the form of [[int, int, int]]
+        """
+        r, g, b = color[0]
+        r,g,b = (r/255.,g/255.,b/255.)
         self.renderer.SetBackground((clamp(r, 0, 1), clamp(g, 0, 1), clamp(b, 0, 1)))
         self.renderer.Modified()
 
-    def move_bg_color(self, color):
-        r, g, b = color
-        r0, b0, g0 = self.renderer.GetBackground()
-        self.renderer.SetBackground((clamp(r + r0, 0, 1), clamp(g + g0, 0, 1), clamp(b + b0, 0, 1)))
-        self.renderer.Modified()
-
-    def apply_velocity_to_bg_color(self, color):
-        t = time.clock() - self.last_color_velocity_update
-        r, g, b = color
-        r0, b0, g0 = self.renderer.GetBackground()
-        self.renderer.SetBackground((clamp(r * t + r0, 0, 1), clamp(g * t + g0, 0, 1), clamp(b * t + b0, 0, 1)))
-        self.renderer.Modified()
-        self.last_bg_color_velocity_update = time.clock()
-
     def set_all_point_colors(self, color):
+        """
+        Sets the color of every point.
+
+        Args:
+            color (tuple, list, np.ndarray, np.generic): a single rgb color in the form of [[int, int, int]]
+        """
         np_color_data = numpy_support.vtk_to_numpy(self.point_colors)
         np_color_data = np.tile(color, (np_color_data.shape[0], 1))
         vtk_data = numpy_support.numpy_to_vtk(num_array=np_color_data, deep=True, array_type=vtk.VTK_UNSIGNED_CHAR)

@@ -10,4 +10,7 @@ A visualizer for Numenta's Hierarchical Temporal Memory Algorithms.
     * `conda install -c conda-forge vtk`
     * `conda install -c anaconda numpy`
     * `pip install nupic`
-    * Windows: `pip install -i https://pypi.anaconda.org/ales-erjavec/simple pyqt4`
+    * installing pyqt4:
+      * Windows:
+        * `pip install -i https://pypi.anaconda.org/ales-erjavec/simple pyqt4`
+        * Use qt designer to create GUIs: `C:\Program Files\Anaconda3\envs\py27\Lib\site-packages\PyQt4\designer.exe`

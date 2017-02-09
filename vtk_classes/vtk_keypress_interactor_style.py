@@ -28,6 +28,10 @@ class VTKKeyPressInteractorStyle(vtk.vtkInteractorStyleTrackballCamera):
         global global_camera_renderWindow
         global_camera_renderWindow = render_window
 
+        # todo: add screenshot function:
+        #   http://www.vtk.org/Wiki/VTK/Examples/Python/Screenshot
+        #   http://doc.qt.io/qt-4.8/qpixmap.html#grabWindow
+        # todo: add window record function if ffmpeg is installed
         global global_keyDic
         global_keyDic = {
             'RECALC': self.recalc_dic,

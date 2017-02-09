@@ -18,6 +18,9 @@ import colorsys
 class TMVisualizer(VTKAnimationTimerCallback):
     def __init__(self, tm, encoder):
         super(TMVisualizer, self).__init__()
+        self.cma = 0
+        self.n = 0
+
         self.tm = tm
         self.encoder = encoder
         self.i = 0
@@ -65,7 +68,7 @@ class TMVisualizer(VTKAnimationTimerCallback):
                                       'm': self.toggle_show_matching_segments,
                                       'Shift_L': {'exclam': self.toggle_show_all_segments}})
 
-        self.set_bg_color([128. / 255, 66. / 255, 21. / 255])
+        self.set_bg_color([[128, 66, 21]])
 
     def toggle_show_all_segments(self):
         self.show_all_segments = not self.show_all_segments
@@ -150,10 +153,16 @@ class TMVisualizer(VTKAnimationTimerCallback):
             if self.i >= 256:
                 if self.j >= 1.1:
                     self.j = 1.005
+                    if self.tm.permanenceIncrement>0:
+                        self.tm.permanenceIncrement = 0
+                        self.tm.permanenceDecrement = 1
+                    else:
+                        self.tm.permanenceIncrement = .2
+                        self.tm.permanenceDecrement = 0
                 else:
-                    self.j+=.005
-                self.tm.reset()
-                self.i = 0
+                    self.j += .005
+                    self.tm.reset()
+                    self.i = 0
 
             self.setup_lerp_all_point_colors(self.default_cell_color, self.change_time)
             self.del_all_lines()
@@ -178,6 +187,21 @@ class TMVisualizer(VTKAnimationTimerCallback):
             if self.show_active_segments:
                 self._show_segments(self.tm.getActiveSegments(),
                                     lambda s: colorsys.hls_to_rgb(0.481, .75 - s.permanence * .5, .5))
+
+
+            #GRAPH THESE:
+            
+            #input abiguity (# of other sequences current input also appears in)
+
+            #ambiguity (# of neurons activated that have been activated in n other patterns)
+
+            #self.cma = (len(self.tm.getMatchingSegments())+self.n*self.cma)/(self.n+1)
+
+            #self.n += 1
+
+            #print(len(self.tm.getMatchingSegments()))
+            # print(len(self.tm.getActiveSegments()))
+            #print(time.clock() - self.current_time)
 
             self.i = (self.i+1)**self.j
 

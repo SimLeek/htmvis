@@ -4,7 +4,7 @@ import numpy as np
 import vtk
 from vtk.util import numpy_support
 
-from util.basic_util import clamp
+from lib.toolbox.integer import minmax as clamp
 from util.idarray import IdArray
 
 from util.numpy_helpers import normalize

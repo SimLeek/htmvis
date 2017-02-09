@@ -1,7 +1,6 @@
 import vtk
 from util.input_util.global_util.key_combinations import GlobalKeyCombinationDictionary as KeyComboClass
 
-
 global_interactor_parent = None
 
 global_camera = None

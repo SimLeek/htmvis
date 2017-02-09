@@ -1,15 +1,15 @@
 import vtk
+from util.input_util.global_util.key_combinations import GlobalKeyCombinationDictionary as KeyComboClass
 
-global_keyDic = None
-global_keys_down = None
 
 global_interactor_parent = None
 
 global_camera = None
 global_camera_renderWindow = None
 
-class VTKKeyPressInteractorStyle(vtk.vtkInteractorStyleTrackballCamera):
+class VTKKeyPressInteractorStyle(vtk.vtkInteractorStyleTrackballCamera, KeyComboClass):
     def __init__(self, camera, render_window, parent=None):
+        KeyComboClass.__init__(self)
         # should work with else statement, but doesnt for some reason
 
         global global_interactor_parent
@@ -32,19 +32,14 @@ class VTKKeyPressInteractorStyle(vtk.vtkInteractorStyleTrackballCamera):
         #   http://www.vtk.org/Wiki/VTK/Examples/Python/Screenshot
         #   http://doc.qt.io/qt-4.8/qpixmap.html#grabWindow
         # todo: add window record function if ffmpeg is installed
-        global global_keyDic
-        global_keyDic = {
-            'RECALC': self.recalc_dic,
+        self.append_input_combinations({
             'w': self._move_forward,
             's': self._move_backward,
             'a': self._yaw_left,
             'd': self._yaw_right,
             'Shift_L': self._pitch_up,
             'space': self._pitch_down
-        }
-
-        global global_keys_down
-        global_keys_down = []
+        })
 
         self.AddObserver("KeyPressEvent", self.keyPress)
         self.AddObserver("KeyReleaseEvent", self.keyRelease)
@@ -61,9 +56,6 @@ class VTKKeyPressInteractorStyle(vtk.vtkInteractorStyleTrackballCamera):
     def dummy_func_2(self, obj, ev):
         pass
 
-    def append_input_keydic(self, keydic):
-        """Keydic must be a dictionary of vtk key strings containing either a keydic or a function"""
-        global_keyDic.update(keydic)
 
     def _move_forward(self):
         # todo: change this to a velocity function with drag and let something else
@@ -105,42 +97,11 @@ class VTKKeyPressInteractorStyle(vtk.vtkInteractorStyleTrackballCamera):
         global_camera.Pitch(-10)
         global_camera_renderWindow.GetInteractor().Render()
 
-    def recalc_dic(self):
-        """calls all the functions in the key dictionary
-        recursively goes through keydics containing keydics until a function is reached"""
-
-        global global_keys_down
-        print(global_keys_down)
-        i = [0]
-        key_dic = [global_keyDic]
-        while True:
-            try:
-                if isinstance(key_dic[-1][global_keys_down[i[-1]]], dict):
-                    key_dic.append(key_dic[-1][global_keys_down[i[-1]]])
-                    i[-1] += 1
-                    i.append(0)
-                    continue
-                elif callable(key_dic[-1][global_keys_down[i[-1]]]):
-                    key_dic[-1][global_keys_down[i[-1]]]()
-            except KeyError:
-                pass
-            except IndexError:
-                pass
-            if i[-1] < len(global_keys_down):
-                i[-1] += 1
-            elif len(i) > 1:
-                i.pop()
-                key_dic.pop()
-            else:
-                break
-
     # noinspection PyPep8Naming
     def keyPress(self, obj, event):
         key = global_interactor_parent.GetKeySym()
-        if key not in global_keys_down:
-            global_keys_down.append(key)
-            global_keyDic['RECALC']()
+        self.key_down(key)
 
     def keyRelease(self, obj, event):
         key = global_interactor_parent.GetKeySym()
-        global_keys_down.remove(key)
+        self.key_up(key)

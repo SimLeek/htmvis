@@ -5,7 +5,7 @@ global_keys_down = None
 class GlobalKeyCombinationDictionary:
     def __init__(self):
         global global_keyDic
-        global_keyDic = {'RECALC': self.recalc_dic}
+        global_keyDic = {'RECALC': self.recalc_key_combination_dictionary}
         global global_keys_down
         global_keys_down = []
 

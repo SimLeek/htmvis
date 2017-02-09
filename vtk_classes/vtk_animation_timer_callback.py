@@ -485,7 +485,7 @@ class VTKAnimationTimerCallback(object):
         Args:
             keydic ():
         """
-        self.interactor_style.append_input_keydic(keydic)
+        self.interactor_style.append_input_combinations(keydic)
 
     def at_start(self):
         """

@@ -1,11 +1,8 @@
 # coding=utf-8
 # !/usr/bin/env python
 
-import math as m
 import time
-
 import numpy as np
-
 from vtk_classes.vtk_animation_timer_callback import VTKAnimationTimerCallback
 
 def add_n_poly_prism(point_displayer, radius, normal, bottom_center, color):
@@ -190,7 +187,7 @@ class TMVisualizer(VTKAnimationTimerCallback):
 
 
             #GRAPH THESE:
-            
+
             #input abiguity (# of other sequences current input also appears in)
 
             #ambiguity (# of neurons activated that have been activated in n other patterns)

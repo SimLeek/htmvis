@@ -1,13 +1,9 @@
-from nupic.data import SENTINEL_VALUE_FOR_MISSING_DATA
-
-from nupic.data.fieldmeta import FieldMetaType
-from nupic.encoders.base import Encoder, EncoderResult
-from vtk_classes.vtk_displayer import VTKDisplayer
-
-import numbers
 import math
-import numpy as np
-
+import numbers
+from nupic.data import SENTINEL_VALUE_FOR_MISSING_DATA
+from nupic.data.fieldmeta import FieldMetaType
+from nupic.encoders.base import Encoder
+from vtk_classes.vtk_displayer import VTKDisplayer
 import choice_numbers as cn
 
 class ChoiceNumberEncoder(Encoder):
@@ -80,8 +76,6 @@ class ChoiceNumberEncoder(Encoder):
 
         n = int(bool_str, 2)
 
-        f_2.seek(18 * n)
-        d = int(f.read(16), 2)
 
         if parentFieldName != '':
             fieldName = "%s.%s" % (parentFieldName, self.name)
@@ -132,7 +126,6 @@ PLEASE READ THROUGH THE CODE COMMENTS - THEY EXPLAIN THE OUTPUT IN DETAIL
 import numpy
 
 # izip for maximum efficiency
-from itertools import izip as zip, count
 
 # Python implementation of Temporal Memory
 
@@ -152,7 +145,7 @@ def formatRow(x):
 
 # Step 1: create Temporal Pooler instance with appropriate parameters
 
-tm = TM(columnDimensions=(24,),
+tm = TM(columnDimensions=(24,4),
         cellsPerColumn=24,
         initialPermanence=0.001,
         connectedPermanence=0.5,

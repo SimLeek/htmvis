@@ -3,7 +3,7 @@
 
 import time
 import numpy as np
-from vtk_classes.vtk_animation_timer_callback import VTKAnimationTimerCallback
+from lib.svtk.vtk_animation_timer_callback import VTKAnimationTimerCallback
 
 def add_n_poly_prism(point_displayer, radius, normal, bottom_center, color):
     pass

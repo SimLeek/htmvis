@@ -25,26 +25,91 @@ from scipy.special import binom
 def min_bits(ones, sparsity):
     return int(m.ceil(ones/sparsity))
 
+assert(min_bits(2, .03)==67)
+
 def min_zeros( ones, sparsity):
     return min_bits(ones,sparsity)-ones
 
+#assert(min_zeros(2, .03)==65)
+
+def find_height_approx(function, height_value, initial_value = 1):
+    #Only works on approximately linear functions
+    power = 0
+    guess = initial_value
+    guessed_value = function(guess)
+
+    #acceleration portion
+    if function(guess) < height_value:
+        while function(guess) < height_value:
+            #print('a',guess, function(guess), height_value)
+            guess += 2**power
+            power += 1
+    elif function(guess) > height_value:
+        while function(guess) > height_value:
+            #print('b',guess, function(guess), height_value)
+            guess -= 2 ** power
+            power += 1
+
+    #deceleration portion
+    while function(guess) != height_value and power>=0:
+        # it may seem strange to decrease the power even if guess value is still < height_value, but
+        #  sum(i=0 to infinity){1/(2^i)}==2, so the guesses will always eventually reach the passed over
+        #  location, even if it was just after the last step in the acceleration portion
+
+        if function(guess) < height_value:
+            guess += 2**power
+            power -= 1
+        #same reasoning with putting if here instead of elif
+        #print('c',guess, function(guess),height_value)
+        if function(guess) >height_value:
+            guess -= 2**power
+            power -= 1
+        #print('d',guess, function(guess), height_value)
+
+    return guess
+
+def find_height_leq(function, height_value, initial_value = 1):
+    guess = find_height_approx(function, height_value, initial_value)
+
+    #keep to leq
+    if guess >height_value:
+        return guess - 1
+    else:
+        return guess
+
+def find_height_geq(function, height_value, initial_value = 1):
+    guess = find_height_approx(function, height_value, initial_value)
+
+    #keep to geq
+    if guess < height_value:
+        return guess + 1
+    else:
+        return guess
+
+assert(find_height_leq(lambda x: min_bits(x, 0.02), 10000)==200)
+
 def all_possibilities(zeros, ones):
+    #clarify that 0^0==1 here
+    if ones <0 or zeros < 0:
+        return 0
+    if ones == 0:
+        return 1
     if ones == 1:
         return (zeros + 1)
     result = (zeros+1)*(ones+zeros)*binom(ones+zeros-1, ones-2) / ((ones-1)*ones)
+    #print(zeros, ones, result)
+    return int(result)
 
-    return result
+def min_bits_required(sparsity, max_number):
+    ones = find_height_geq(lambda x:all_possibilities(min_zeros(x, sparsity), x), max_number)
+    zeros = find_height_geq(lambda z:all_possibilities(z, ones), max_number, min_zeros(ones, sparsity))
+    if zeros < min_zeros(ones, sparsity):
+        zeros = min_zeros(ones, sparsity)
+    return ones+zeros, ones, zeros
 
-def find_height_leq(function, height_value):
-    power = 0
+assert (min_bits_required(.02, 500) == (100, 2, 98))
 
-    while True:
-
-
-
-print(find_height_leq(lambda x:min_zeros(x, 0.02), 10000))
-
-def bits_required(ones, max_number):
+'''def bits_required(ones, max_number):
     if ones <=0:
         raise ValueError("ones cannot be below or equal to 0.")
     if ones == 1:
@@ -56,24 +121,7 @@ def bits_required(ones, max_number):
         num_zeros = m.ceil((-3+m.sqrt(8*max_number+1))/2.0)
         return num_zeros + ones
 
-    guess = 200
-    iteration = 1
-
-    while True:
-        if all_possibilities(guess-1, ones)>max_number:
-            guess = int(m.ceil(guess - max((guess/(2.0**iteration)),1)))
-            #print('+', guess)
-        elif all_possibilities(guess, ones)<max_number:
-            guess = int(m.floor(guess + max((guess/(2.0**iteration)),1)))
-            #print('-', guess)
-        else:
-            print(cumulative_possibilities(guess, ones, guess),'i',max_number)
-            if cumulative_possibilities(guess, ones, guess)==max_number:
-                return guess+1
-            return guess
-        iteration+=1
-
-
+    return find_height_geq(lambda z:all_possibilities(z, ones), max_number, min_zeros(ones, sparsity)) + ones'''
 
 def possibilities(zeros, ones, zeros_between_ones):
     if ones==1 and zeros_between_ones == 0: #we need to specify that 0^0=1 in this case

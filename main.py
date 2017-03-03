@@ -3,7 +3,7 @@ import numbers
 from nupic.data import SENTINEL_VALUE_FOR_MISSING_DATA
 from nupic.data.fieldmeta import FieldMetaType
 from nupic.encoders.base import Encoder
-from vtk_classes.vtk_displayer import VTKDisplayer
+from lib.svtk.vtk_displayer import VTKDisplayer
 import choice_numbers as cn
 
 class ChoiceNumberEncoder(Encoder):

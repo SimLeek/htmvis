@@ -11,6 +11,8 @@ def choose(n, r):
         return 0
     return numer//denom
 
+# put 0s in between 1s, assign 1 slot to each 0. eq: #of slots^#of 0s
+# to determine remaining: #of slots left^#of 0s left
 def nth_perm(n, on_bits, total_bits, clamp=False, wrap=False):
     #http://math.stackexchange.com/a/1072064/324663
     assert(not (clamp and wrap))

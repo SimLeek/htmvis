@@ -1,20 +1,5 @@
-'''import numpy as np
-
-x = np.arange(20,1,-1)
-
-indices = np.arange(0,10,2)
-
-subtractor = 5
-
-x[indices] -=subtractor
-
-print(x)'''
-
-#from wolfram
-#sum_(i=0)^z (x - 1)^i (-i + z + 1) = (x^2 (x - 1)^z - 2 x (x - 1)^z + (x - 1)^z - x z - 2 x + 2 z + 3)/(x - 2)^2
-# where z=zeros, x=ones
-#next:
-# solve for z, q=(sum i=0 to z, ((z-i+1)*(x-1)^i))
+#todo: add option to add zeros_between_ones and permutation_number onto the encoding for added clarity
+#todo: also, add that option for those additions themselves, at least until they're trivial (ones == 1)
 
 import unittest
 
